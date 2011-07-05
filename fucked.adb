@@ -25,20 +25,20 @@ procedure Fucked is
 
     Code : Characters.Vector;
 
-    procedure Interpret (Code : Characters.Vector) is
+    procedure Interpret (Code : in Characters.Vector) is
         Stack : Stack_Type;
         Loop_Stack : Numbers.Vector;
         Position, Offset, Current : Natural := 0;
     begin
         while Offset < Natural (Code.Length) loop
             Current := Stack (Position);
-            Offset := Offset + 1;
 
-            case Code.Element (Offset - 1) is
+            case Code.Element (Offset) is
                 -- increment the data pointer (to point to the next cell to the
                 -- right).
                 when '>' =>
                     Position := Position + 1;
+                    Offset := Offset + 1;
 
                     if Stack'Length < Position then
                         raise Stack_Overflow;
@@ -52,19 +52,23 @@ procedure Fucked is
                     end if;
 
                     Position := Position - 1;
+                    Offset := Offset + 1;
 
                 -- increment (increase by one) the byte at the data pointer.
                 when '+' =>
                     Stack (Position) := Current + 1;
+                    Offset := Offset + 1;
 
                 -- decrement (decrease by one) the byte at the data pointer.
                 when '-' =>
                     Stack (Position) := Current - 1;
+                    Offset := Offset + 1;
 
                 -- output a character, the ASCII value of which being the byte at
                 -- the data pointer.
                 when '.' =>
                     Put (Character'Val (Stack (Position)));
+                    Offset := Offset + 1;
 
                 -- accept one byte of input, storing its value in the byte at the
                 -- data pointer.
@@ -75,8 +79,10 @@ procedure Fucked is
                 -- the instruction pointer forward to the next command, jump it
                 -- forward to the command after the matching ] command*.
                 when '[' =>
-                    if Current > 0 then
-                        Loop_Stack.Append (Offset);
+
+                    Offset := Offset + 1;
+                    if Current /= 0 then
+                        Loop_Stack.Append (Offset - 1);
                     else
                         -- If the counter is back to zero then we need to jump
                         -- ahead to the corresponding ']' for this loop
@@ -84,7 +90,7 @@ procedure Fucked is
                             Count_Back : Natural := 1;
                         begin
                             while Count_Back > 0 loop
-                                case Code.Element (Count_Back) is
+                                case Code.Element (Offset) is
                                     when ']' =>
                                         Count_Back := Count_Back - 1;
 
@@ -104,20 +110,11 @@ procedure Fucked is
                 -- moving the instruction pointer forward to the next command,
                 -- jump it back to the command after the matching [ command*.
                 when ']' =>
-                    declare
-                        Back_To : constant Natural := Loop_Stack.Element (
-                                                        Integer (Loop_Stack.Length - 1));
-                        Counter : constant Natural := Stack (Position);
-                    begin
-                        if Counter = 0 then
-                            Numbers.Delete_Last (Loop_Stack);
-                        else
-                            Offset := Back_To;
-                        end if;
-                    end;
+                    Offset := Loop_Stack.Element (Integer (Loop_Stack.Length - 1));
+                    Numbers.Delete_Last (Loop_Stack);
 
                 when others =>
-                    null;
+                    Offset := Offset + 1;
 
             end case;
         end loop;
