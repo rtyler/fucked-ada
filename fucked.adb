@@ -5,11 +5,13 @@
 with Ada.Command_Line,
      Ada.Containers.Vectors,
      Ada.Sequential_IO,
-     Ada.Text_IO;
+     Ada.Text_IO,
+     Ada.Strings.Unbounded;
 
 procedure Fucked is
     use Ada.Containers,
-        Ada.Text_IO;
+        Ada.Text_IO,
+        Ada.Strings.Unbounded;
 
     package CLI renames Ada.Command_Line;
     package Char_IO is new Ada.Sequential_IO (Character);
@@ -17,18 +19,54 @@ procedure Fucked is
     package Numbers is new Ada.Containers.Vectors (Natural, Natural);
 
 
-    type Stack_Type is array (0 .. 30_000) of Natural;
+    type Cell is mod 2**8;
+    type Stack_Type is array (0 .. 30_000) of Cell;
     Stack_Overflow : exception;
     Stack_Underflow : exception;
-    Not_Implemented : exception;
-
+    GotEOF : Boolean := False;
+    GotLine : Boolean := False;
+    InpLine : Unbounded_String;
 
     Code : Characters.Vector;
 
+    procedure putch(ch : Cell) is
+    begin
+        if ch = 10 then
+            Put_Line("");
+        else
+            Put (Character'Val (ch));
+        end if;
+    end putch;
+
+    function getch(oldch : Cell) return Cell is
+        ch : Cell;
+    begin
+        ch := oldch;
+        if GotEOF then return ch ; end if;
+        if Not GotLine then
+            begin
+                InpLine := To_Unbounded_String(Get_line);
+                GotLine := True;
+            exception
+                when End_Error =>
+                    GotEOF := True;
+                    return oldch;
+            end;
+        end if;
+        if InpLine = "" then
+            GotLine := False;
+            return 10;
+        end if;
+        ch := Character'Pos (Slice(InpLine, 1, 1)(1));
+        InpLine := Delete(InpLine, 1, 1);
+        return ch;
+    end getch;
+
     procedure Interpret (Code : in Characters.Vector) is
-        Stack : Stack_Type;
+        Stack : Stack_Type := (others => 0);
         Loop_Stack : Numbers.Vector;
-        Position, Offset, Current : Natural := 0;
+        Position, Offset : Natural := 0;
+        Current : Cell := 0;
     begin
         while Offset < Natural (Code.Length) loop
             Current := Stack (Position);
@@ -67,13 +105,14 @@ procedure Fucked is
                 -- output a character, the ASCII value of which being the byte at
                 -- the data pointer.
                 when '.' =>
-                    Put (Character'Val (Stack (Position)));
+                    putch (Stack (Position));
                     Offset := Offset + 1;
 
                 -- accept one byte of input, storing its value in the byte at the
                 -- data pointer.
                 when ',' =>
-                    raise Not_Implemented;
+                    Stack (Position) := getch (Stack (Position));
+                    Offset := Offset + 1;
 
                 -- if the byte at the data pointer is zero, then instead of moving
                 -- the instruction pointer forward to the next command, jump it
